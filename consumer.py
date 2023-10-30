@@ -1,7 +1,5 @@
 import socket, sys, time, signal
 
-from server import print_with_lock
-
 def parseKafkaMsg(msg):
     msg = msg.split(',')
     if (msg.__len__() != 2):

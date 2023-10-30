@@ -24,6 +24,14 @@ class messageType():
 def makeKafkaMsg(data, msgType):
     return 'type=' + msgType +',data=' + data
 
+def parseKafkaMsg(msg):
+    msg = msg.split(',')
+    if (msg.__len__() != 2):
+        return None, None
+    msgType = msg[0].split('=')[1]
+    data = msg[1].split('=')[1]
+    return msgType, data
+
 ##
 # @brief this single thread will be used to accept all connections from producer process
 def producer_procedure():
@@ -38,22 +46,21 @@ def producer_procedure():
         fd = conn.fileno()
         connected_producers[fd] = conn
         while True:
-            try:
-                recv_data = conn.recv(1024).decode()
-            except:
+            recv_data = conn.recv(1024).decode()
+            msgType, data = parseKafkaMsg(recv_data)
+            if (msgType == 'EVENT' and data):
+                print_with_lock('[Events created]')
+                queue_lock.acquire()
+                for i in range(len(data)):
+                    global_queue.append(str(data[i]))
+                queue_lock.release()
+                print_with_lock('[Remain events: ' + str(len(global_queue)) + ']')
+            else:
+                #connection closed
                 print_with_lock('[Producer disconnected]')
                 connected_producers.pop(fd)
                 conn.close()
                 break
-            data = str(recv_data)
-            if not data:
-                break
-            print_with_lock('[Events created]')
-            queue_lock.acquire()
-            for i in range(data.__len__()):
-                global_queue.append(str(data[i]))
-            queue_lock.release()
-            print_with_lock('[Remain events: ' + str(len(global_queue)) + ']')
 
 ##
 # @brief this single thread will be used to accept all connections from consumer process
