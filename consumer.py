@@ -1,4 +1,4 @@
-import socket, sys, time
+import socket, sys, time, signal
 
 def main(argv, args):
     if (argv.__len__() != 3):
@@ -6,7 +6,7 @@ def main(argv, args):
         return
 
     #connect to server
-
+    global server
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.connect((argv[1], int(argv[2])))
     
@@ -23,6 +23,12 @@ def main(argv, args):
             print('No event in Queue')
         time.sleep(1)
 
+def signal_handler(sig, frame):
+    print('Exiting consumer...')
+    server.shutdown(socket.SHUT_RDWR)
+    server.close()
+    sys.exit(0)
 
 if __name__ == '__main__':
+    signal.signal(signal.SIGINT, signal_handler)
     main(sys.argv, sys.argv)

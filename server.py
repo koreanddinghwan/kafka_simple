@@ -30,13 +30,14 @@ def producer_procedure():
         conn, addr = server.accept()
         conn.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
         print_with_lock('[Producer connected]')
-        connected_producers[conn.fileno()] = conn
+        fd = conn.fileno()
+        connected_producers[fd] = conn
         while True:
             try:
                 recv_data = conn.recv(8).decode()
             except:
                 print_with_lock('[Producer disconnected]')
-                connected_producers.pop(conn.fileno())
+                connected_producers.pop(fd)
                 conn.close()
                 break
             data = str(recv_data)
@@ -55,23 +56,29 @@ def producer_procedure():
 def consumer_procedure(conn, addr):
     while True:
         data = ""
+        fd = conn.fileno()
         queue_lock.acquire()
         if len(global_queue) != 0:
-            print_with_lock('[Remain events: ' + str(len(global_queue)) + ']')
             data = str(global_queue.popleft()).encode()
+            print_with_lock('[' + 'Consumed' + data.decode() + '# Of Remain events: ' + str(len(global_queue)) + ']')
             try:
                 conn.send(data)
                 queue_lock.release()
             except:
                 # recover event
                 print_with_lock('[Consumer disconnected]')
-                connected_consumers.pop(conn.fileno())
+                connected_consumers.pop(fd)
                 global_queue.appendleft(data.decode())
-                conn.close()
                 queue_lock.release()
                 break
         else:
-           queue_lock.release()
+            #check the consumer is alive by sending heartbeat
+            try:
+                conn.send(''.encode())
+            except:
+                print_with_lock('[Consumer disconnected]')
+                connected_consumers.pop(fd)
+            queue_lock.release()
         time.sleep(1)
 
 def signal_handler(sig, frame):
@@ -101,7 +108,6 @@ def main(argv, args):
         conn, addr = server.accept()
         conn.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
         print_with_lock('[Consumer connected]')
-        print_with_lock(conn)
         connected_consumers[conn.fileno()] = conn
         conn.send(str(len(connected_consumers)).encode())
         consumer = Thread(target=consumer_procedure, args=(conn, addr))
