@@ -1,6 +1,7 @@
 import socket, sys, struct, time, signal
 from threading import Thread, Lock
 from collections import deque
+from enum import Enum
 
 global_queue = deque()
 queue_lock = Lock()
@@ -11,12 +12,17 @@ connected_consumers = {}
 
 # when multiple threads are prints, it will be mixed up
 # so, we need to use this global lock to print one by one
-
 def print_with_lock(msg):
     print_lock.acquire()
     print(msg)
     print_lock.release()
 
+class messageType():
+    EVENT = 'EVENT'
+    HEARTBEAT = 'HEARTBEAT'
+
+def makeKafkaMsg(data, msgType):
+    return 'type=' + msgType +',data=' + data
 
 ##
 # @brief this single thread will be used to accept all connections from producer process
@@ -28,13 +34,12 @@ def producer_procedure():
     server.listen(5)
     while True:
         conn, addr = server.accept()
-        conn.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
         print_with_lock('[Producer connected]')
         fd = conn.fileno()
         connected_producers[fd] = conn
         while True:
             try:
-                recv_data = conn.recv(8).decode()
+                recv_data = conn.recv(1024).decode()
             except:
                 print_with_lock('[Producer disconnected]')
                 connected_producers.pop(fd)
@@ -43,7 +48,6 @@ def producer_procedure():
             data = str(recv_data)
             if not data:
                 break
-            print_with_lock('Received: ' + str(data))
             print_with_lock('[Events created]')
             queue_lock.acquire()
             for i in range(data.__len__()):
@@ -59,39 +63,49 @@ def consumer_procedure(conn, addr):
         fd = conn.fileno()
         queue_lock.acquire()
         if len(global_queue) != 0:
-            data = str(global_queue.popleft()).encode()
-            print_with_lock('[' + 'Consumed' + data.decode() + '# Of Remain events: ' + str(len(global_queue)) + ']')
+            data = str(global_queue.popleft())
+            print_with_lock('[' + 'Consumed ' + data + ' |# Of Remain events: ' + str(len(global_queue)) + ']')
             try:
-                conn.send(data)
+                msg = makeKafkaMsg(data, messageType.EVENT)
+                conn.send(msg.encode())
                 queue_lock.release()
-            except:
+            except Exception as e:
+                print_with_lock('[exception]')
+                print_with_lock(e)
                 # recover event
-                print_with_lock('[Consumer disconnected]')
+                print_with_lock('[Consumer ' + str(fd) + ' disconnected]')
+                global_queue.appendleft(data)
+                consumer_lock.acquire()
                 connected_consumers.pop(fd)
-                global_queue.appendleft(data.decode())
+                print_with_lock('[' + str(len(connected_consumers)) + ' consumers online]')
+                consumer_lock.release()
                 queue_lock.release()
                 break
         else:
             #check the consumer is alive by sending heartbeat
             try:
-                conn.send(''.encode())
-            except:
-                print_with_lock('[Consumer disconnected]')
+                msg = makeKafkaMsg('', messageType.HEARTBEAT)
+                conn.send(msg.encode())
+            except Exception as e:
+                print_with_lock('[exception]')
+                print_with_lock(e)
+                queue_lock.release()
+                print_with_lock('[Consumer ' + str(fd) + ' disconnected]')
+                consumer_lock.acquire()
                 connected_consumers.pop(fd)
+                print_with_lock('[' + str(len(connected_consumers)) + ' consumers online]')
+                consumer_lock.release()
+                break
             queue_lock.release()
         time.sleep(1)
 
 def signal_handler(sig, frame):
     print('\nExit')
-    for conn in connected_producers.values():
-        conn.close()
-    for conn in connected_consumers.values():
-        conn.close()
     raise SystemExit(sig)
 
 def main(argv, args):
 
-    if (argv.__len__() != 4):
+    if (argv.__len__() != 4 or argv[2].isdigit() == False or argv[3].isdigit() == False):
         print("Usage: python3 server.py <server_ip> <producer_connection port> <consumer_connection port>")
         return
 
@@ -106,14 +120,15 @@ def main(argv, args):
     server.listen(5)
     while True:
         conn, addr = server.accept()
-        conn.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
         print_with_lock('[Consumer connected]')
+        consumer_lock.acquire()
         connected_consumers[conn.fileno()] = conn
-        conn.send(str(len(connected_consumers)).encode())
+        conn.send(str(conn.fileno()).encode())
+        print_with_lock('[' + str(len(connected_consumers)) + ' consumers online]')
+        consumer_lock.release()
         consumer = Thread(target=consumer_procedure, args=(conn, addr))
         consumer.daemon = True
         consumer.start()
-        connected_consumers[conn.fileno()] = consumer
 
 if __name__ == '__main__':
     main(sys.argv, sys.argv)

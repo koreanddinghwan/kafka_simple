@@ -2,7 +2,7 @@ import socket, sys, signal
 
 
 def main(argv, args):
-    if (argv.__len__() != 3):
+    if (argv.__len__() != 3 or argv[2].isdigit() == False):
         print("Usage: python3 producer.py <server_ip> <server_port>")
         return
 
