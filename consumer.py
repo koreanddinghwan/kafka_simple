@@ -15,9 +15,9 @@ def main(argv, args):
 
     #connect to server
     global server
+    addrInfo = socket.getaddrinfo(sys.argv[1], sys.argv[2], family=socket.AF_INET, proto=socket.IPPROTO_TCP)
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-    server.connect((argv[1], int(argv[2])))
+    server.connect((addrInfo[0][4][0], addrInfo[0][4][1]))
     
     consumer_number = server.recv(1);
 

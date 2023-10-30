@@ -12,7 +12,8 @@ def main(argv, args):
     #connect to server
     global server
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.connect((argv[1], int(argv[2])))
+    addrInfo = socket.getaddrinfo(sys.argv[1], sys.argv[2], family=socket.AF_INET, proto=socket.IPPROTO_TCP)
+    server.connect((addrInfo[0][4][0], addrInfo[0][4][1]))
     print('Connected to server')
 
     #get input from user
