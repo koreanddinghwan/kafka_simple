@@ -4,6 +4,8 @@ from server import print_with_lock
 
 def parseKafkaMsg(msg):
     msg = msg.split(',')
+    if (msg.__len__() != 2):
+        return None, None
     msgType = msg[0].split('=')[1]
     data = msg[1].split('=')[1]
     return msgType, data
@@ -28,8 +30,13 @@ def main(argv, args):
         msgType, data = parseKafkaMsg(data)
         if (msgType == 'EVENT'):
             print('Event ' + str(data) + ' is processed in consumer ' + str(consumer_number.decode()))
-        else:
+        elif (msgType == 'HEARTBEAT'):
             print('No event in Queue')
+        else:
+            #connection closed
+            print('Connection closed')
+            server.close()
+            break
         time.sleep(1)
 
 def signal_handler(sig, frame):

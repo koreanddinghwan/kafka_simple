@@ -69,9 +69,7 @@ def consumer_procedure(conn, addr):
                 msg = makeKafkaMsg(data, messageType.EVENT)
                 conn.send(msg.encode())
                 queue_lock.release()
-            except Exception as e:
-                print_with_lock('[exception]')
-                print_with_lock(e)
+            except:
                 # recover event
                 print_with_lock('[Consumer ' + str(fd) + ' disconnected]')
                 global_queue.appendleft(data)
@@ -86,9 +84,7 @@ def consumer_procedure(conn, addr):
             try:
                 msg = makeKafkaMsg('', messageType.HEARTBEAT)
                 conn.send(msg.encode())
-            except Exception as e:
-                print_with_lock('[exception]')
-                print_with_lock(e)
+            except:
                 queue_lock.release()
                 print_with_lock('[Consumer ' + str(fd) + ' disconnected]')
                 consumer_lock.acquire()
@@ -101,6 +97,8 @@ def consumer_procedure(conn, addr):
 
 def signal_handler(sig, frame):
     print('\nExit')
+    for fd in connected_producers:
+        connected_producers[fd].close()
     raise SystemExit(sig)
 
 def main(argv, args):
@@ -120,7 +118,7 @@ def main(argv, args):
     server.listen(5)
     while True:
         conn, addr = server.accept()
-        print_with_lock('[Consumer connected]')
+        print_with_lock('[Consumer ' + str(conn.fileno()) + ' connected]')
         consumer_lock.acquire()
         connected_consumers[conn.fileno()] = conn
         conn.send(str(conn.fileno()).encode())
