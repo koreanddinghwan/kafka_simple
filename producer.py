@@ -19,6 +19,8 @@ def main(argv, args):
     #get input from user
     while True:
         msg = input('>>')
+        if not msg:
+            continue
         kafkaMsg = makeKafkaMsg(msg, 'EVENT')
         print(str(msg.__len__()) + ' events are created')
         server.send(kafkaMsg.encode())
