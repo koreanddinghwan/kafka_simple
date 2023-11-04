@@ -107,6 +107,8 @@ def signal_handler(sig, frame):
     print('\nExit')
     for fd in connected_producers:
         connected_producers[fd].close()
+    for fd in connected_consumers:
+        connected_consumers[fd].close()
     raise SystemExit(sig)
 
 def main(argv, args):
