@@ -39,7 +39,6 @@ def main(argv, args):
 
 def signal_handler(sig, frame):
     print('Exiting consumer...')
-    server.shutdown(socket.SHUT_RDWR)
     server.close()
     sys.exit(0)
 
