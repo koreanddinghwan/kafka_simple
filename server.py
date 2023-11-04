@@ -35,7 +35,6 @@ def parseKafkaMsg(msg):
 ##
 # @brief this single thread will be used to accept all connections from producer process
 def producer_procedure():
-    print('producer_procedure')
     addrInfo = socket.getaddrinfo(sys.argv[1], sys.argv[2], family=socket.AF_INET, proto=socket.IPPROTO_TCP)
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
